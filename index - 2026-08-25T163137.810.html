@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b0d10">
+<title>Offline AI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236a5cff'/%3E%3Cpath d='M30 65 L50 25 L70 65 M38 50 L62 50' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0b0d10; --bg2:#111419; --panel:#161a20; --border:#232830;
+  --ink:#e9ecf1; --ink-dim:#8b93a1; --accent:#6a5cff; --accent2:#00e5b0;
+  --danger:#ff5c72; --radius:18px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:
+    radial-gradient(1200px 600px at 100% -10%, rgba(106,92,255,.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(0,229,176,.10), transparent 60%),
+    var(--bg);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+}
+.topbar{
+  display:flex; align-items:center; gap:10px; padding:14px 16px;
+  padding-top:calc(14px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--border); background:rgba(17,20,25,.7); backdrop-filter:blur(10px);
+  position:sticky; top:0; z-index:5;
+}
+.mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#a78bfa);
+  display:flex;align-items:center;justify-content:center; font-weight:700; font-size:14px; flex-shrink:0;
+  box-shadow:0 4px 14px rgba(106,92,255,.4);}
+.title{font-weight:600; font-size:15px; letter-spacing:.2px;}
+.sub{font-size:11px; color:var(--ink-dim); margin-top:1px; display:flex; gap:6px; align-items:center;}
+.dot{width:6px;height:6px;border-radius:50%; background:var(--ink-dim); flex-shrink:0;}
+.dot.on{background:var(--accent2); box-shadow:0 0 6px var(--accent2);}
+.iconbtn{margin-left:auto; background:none; border:1px solid var(--border); color:var(--ink-dim);
+  width:34px;height:34px;border-radius:10px; display:flex;align-items:center;justify-content:center; cursor:pointer;}
+.iconbtn:active{background:var(--panel);}
+
+#setup{flex:1; overflow-y:auto; padding:20px 18px 40px; display:flex; flex-direction:column; gap:14px;}
+.hero{padding:6px 2px 4px;}
+.hero h1{font-size:22px; margin:0 0 6px; letter-spacing:-.3px;}
+.hero p{margin:0; color:var(--ink-dim); font-size:13.5px; line-height:1.5;}
+.badge{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; padding:5px 10px; border-radius:20px;
+  background:var(--panel); border:1px solid var(--border); color:var(--ink-dim); margin-bottom:10px;}
+.badge b{color:var(--ink);}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px;}
+.model{display:flex; align-items:center; gap:12px; padding:13px; border:1px solid var(--border);
+  border-radius:14px; margin-bottom:10px; cursor:pointer; background:var(--bg2); transition:.15s;}
+.model:last-child{margin-bottom:0;}
+.model.sel{border-color:var(--accent); background:linear-gradient(180deg, rgba(106,92,255,.14), rgba(106,92,255,.04));}
+.model.disabled{opacity:.4; pointer-events:none;}
+.model .r{width:18px;height:18px;border-radius:50%;border:2px solid var(--ink-dim); flex-shrink:0; position:relative;}
+.model.sel .r{border-color:var(--accent);}
+.model.sel .r::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--accent);}
+.model .m{flex:1; min-width:0;}
+.model .m b{display:block; font-size:14px; font-weight:600;}
+.model .m span{display:block; font-size:11.5px; color:var(--ink-dim); margin-top:2px;}
+.tag{font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; background:rgba(0,229,176,.14); color:var(--accent2); flex-shrink:0;}
+.tag.big{background:rgba(255,92,114,.14); color:var(--danger);}
+
+.go{background:linear-gradient(135deg,var(--accent),#8b7bff); color:#fff; border:none; border-radius:14px;
+  padding:15px; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  box-shadow:0 8px 24px rgba(106,92,255,.35);}
+.go:active{transform:scale(.98);}
+.go:disabled{opacity:.5;}
+.note{font-size:11.5px; color:var(--ink-dim); text-align:center; line-height:1.5;}
+
+.progwrap{display:none; flex-direction:column; gap:8px; padding-top:2px;}
+.progwrap.show{display:flex;}
+.bar{height:8px; border-radius:20px; background:var(--bg2); overflow:hidden; border:1px solid var(--border);}
+.bar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .25s;}
+.proglabel{font-size:11.5px; color:var(--ink-dim); display:flex; justify-content:space-between;}
+
+#chat{flex:1; overflow-y:auto; padding:16px 14px 10px; display:none; flex-direction:column; gap:14px;}
+#chat.show{display:flex;}
+.msg{max-width:86%; padding:12px 14px; border-radius:16px; font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word;}
+.msg.user{align-self:flex-end; background:linear-gradient(135deg,var(--accent),#8b7bff); color:#fff; border-bottom-right-radius:5px;}
+.msg.bot{align-self:flex-start; background:var(--panel); border:1px solid var(--border); border-bottom-left-radius:5px;}
+.msg.bot.thinking{color:var(--ink-dim);}
+.empty{margin:auto; text-align:center; color:var(--ink-dim); font-size:13px; padding:30px;}
+.empty b{display:block; color:var(--ink); font-size:16px; margin-bottom:6px;}
+
+.dots span{display:inline-block;width:6px;height:6px;margin-right:3px;border-radius:50%;background:var(--ink-dim);animation:blink 1.2s infinite;}
+.dots span:nth-child(2){animation-delay:.2s;} .dots span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.25} 40%{opacity:1}}
+
+#inputbar{display:none; padding:10px 12px; padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border); background:rgba(17,20,25,.85); backdrop-filter:blur(10px); gap:8px; align-items:flex-end;}
+#inputbar.show{display:flex;}
+#txt{flex:1; resize:none; max-height:120px; background:var(--bg2); border:1px solid var(--border); color:var(--ink);
+  border-radius:16px; padding:12px 14px; font-size:15px; font-family:inherit; outline:none;}
+#txt:focus{border-color:var(--accent);}
+#send{width:44px;height:44px;border-radius:14px;border:none; background:var(--accent); color:#fff; flex-shrink:0;
+  display:flex;align-items:center;justify-content:center; cursor:pointer;}
+#send:disabled{opacity:.4;}
+#send:active{transform:scale(.94);}
+
+.toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#1c2028; border:1px solid var(--border);
+  color:var(--ink); padding:11px 16px; border-radius:12px; font-size:13px; z-index:50; display:none; box-shadow:0 10px 30px rgba(0,0,0,.4); max-width:88%; text-align:center;}
+.errbar{display:none; align-items:flex-start; gap:10px; background:linear-gradient(180deg, rgba(255,92,114,.14), rgba(255,92,114,.04));
+  border:1px solid rgba(255,92,114,.4); border-radius:14px; padding:13px 14px; font-size:13px; line-height:1.5; color:var(--ink);}
+.errbar.show{display:flex;}
+.errbar b{color:var(--danger); display:block; margin-bottom:2px; font-size:12.5px;}
+.errbar .x{margin-left:auto; background:none; border:none; color:var(--ink-dim); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; flex-shrink:0;}
+.downloaded{font-size:10px; font-weight:700; color:var(--accent2); margin-left:6px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="mark">AI</div>
+  <div>
+    <div class="title">Offline AI</div>
+    <div class="sub"><span class="dot" id="statusDot"></span><span id="statusText">not loaded</span></div>
+  </div>
+  <button class="iconbtn" id="resetBtn" title="Reset chat">↺</button>
+</div>
+
+<div id="setup">
+  <div class="hero">
+    <span class="badge" id="engineBadge">Checking device… <b id="engineBadgeVal"></b></span>
+    <h1>Your own model. Your own phone. No signal needed.</h1>
+    <p>Pick a model, it downloads once and caches on this device, then every chat after runs 100% offline. Works even without a fancy GPU — automatically falls back to CPU mode.</p>
+  </div>
+
+  <div class="card">
+    <div class="model sel" data-gpu="" data-cpu="HuggingFaceTB/SmolLM2-135M-Instruct" data-size="~110 MB">
+      <div class="r"></div>
+      <div class="m"><b>SmolLM2 · 135M</b><span>Ultra-light. Lowest memory use, safest on in-app browsers.</span></div>
+      <div class="tag">ultra light</div>
+    </div>
+    <div class="model" data-gpu="Qwen2.5-0.5B-Instruct-q4f16_1-MLC" data-cpu="onnx-community/Qwen2.5-0.5B-Instruct" data-size="~360 MB / ~300 MB">
+      <div class="r"></div>
+      <div class="m"><b>Qwen 2.5 · 0.5B</b><span>Fastest reasoning. Needs more free memory.</span></div>
+      <div class="tag">small</div>
+    </div>
+    <div class="model" data-gpu="SmolLM2-1.7B-Instruct-q4f16_1-MLC" data-cpu="HuggingFaceTB/SmolLM2-1.7B-Instruct" data-size="~1.1 GB">
+      <div class="r"></div>
+      <div class="m"><b>SmolLM2 · 1.7B</b><span>Balanced. Slow on CPU-only fallback.</span></div>
+      <div class="tag">medium</div>
+    </div>
+    <div class="model" data-gpu="Llama-3.2-3B-Instruct-q4f16_1-MLC" data-cpu="" data-size="~1.9 GB">
+      <div class="r"></div>
+      <div class="m"><b>Llama 3.2 · 3B</b><span>Smartest. Needs WebGPU — hidden without it.</span></div>
+      <div class="tag big">large</div>
+    </div>
+  </div>
+
+  <button class="go" id="loadBtn">Download &amp; run on this phone</button>
+  <div class="note" id="staticNote">One-time download over Wi‑Fi recommended. After that: airplane mode works fine.</div>
+
+  <div class="errbar" id="errbar"><div><b id="errTitle">Error</b><span id="errMsg"></span></div><button class="x" id="errX">×</button></div>
+
+  <div class="progwrap" id="progwrap">
+    <div class="bar"><i id="progFill"></i></div>
+    <div class="proglabel"><span id="progText">Starting…</span><span id="progPct">0%</span></div>
+  </div>
+</div>
+
+<div id="chat">
+  <div class="empty" id="emptyState"><b>Model is ready.</b>Ask anything. It never leaves your phone.</div>
+</div>
+
+<div id="inputbar">
+  <textarea id="txt" rows="1" placeholder="Message… (offline)"></textarea>
+  <button id="send" disabled>↑</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const setup = $('#setup'), chat = $('#chat'), inputbar = $('#inputbar');
+const statusDot = $('#statusDot'), statusText = $('#statusText');
+const progwrap = $('#progwrap'), progFill = $('#progFill'), progText = $('#progText'), progPct = $('#progPct');
+const loadBtn = $('#loadBtn'), toast = $('#toast'), emptyState = $('#emptyState');
+const txt = $('#txt'), sendBtn = $('#send');
+const engineBadgeVal = $('#engineBadgeVal');
+
+let selectedEl = document.querySelector('.model.sel');
+let engineType = null;   // 'webgpu' | 'wasm'
+let webllm = null, engine = null;   // webgpu path (main thread)
+// wasm path runs fully inside cpuWorker (see below) so the page never freezes
+let history = [{ role: "system", content: "You are a concise, helpful offline assistant running locally on the user's phone." }];
+let generating = false;
+
+document.querySelectorAll('.model').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    if(el.classList.contains('disabled')) return;
+    document.querySelectorAll('.model').forEach(m=>m.classList.remove('sel'));
+    el.classList.add('sel');
+    selectedEl = el;
+  });
+});
+
+function showToast(msg, ms=3200){
+  toast.textContent = msg; toast.style.display='block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> toast.style.display='none', ms);
+}
+
+const errbar = document.getElementById('errbar');
+const errTitle = document.getElementById('errTitle');
+const errMsg = document.getElementById('errMsg');
+document.getElementById('errX').addEventListener('click', ()=> errbar.classList.remove('show'));
+function showError(msg, title){
+  errTitle.textContent = title || 'Load failed';
+  errMsg.textContent = msg;
+  errbar.classList.add('show');
+}
+function clearError(){ errbar.classList.remove('show'); }
+
+function downloadedList(){
+  try{ return JSON.parse(localStorage.getItem('offlineai_downloaded')||'[]'); }catch(e){ return []; }
+}
+function markDownloaded(id){
+  const l = downloadedList();
+  if(!l.includes(id)){ l.push(id); localStorage.setItem('offlineai_downloaded', JSON.stringify(l)); }
+}
+function isDownloaded(id){ return id && downloadedList().includes(id); }
+function refreshDownloadedTags(){
+  document.querySelectorAll('.model').forEach(el=>{
+    const id = engineType==='webgpu' ? el.dataset.gpu : el.dataset.cpu;
+    let mark = el.querySelector('.downloaded');
+    if(isDownloaded(id)){
+      if(!mark){ mark = document.createElement('span'); mark.className='downloaded'; mark.textContent='✓ on device'; el.querySelector('.m').appendChild(mark); }
+    } else if(mark){ mark.remove(); }
+  });
+}
+
+function resetLoadUI(){
+  progwrap.classList.remove('show');
+  progFill.style.width = '0%';
+  progPct.textContent = '0%';
+  loadBtn.disabled = false;
+  statusText.textContent = 'not loaded';
+}
+
+function isEmbeddedWebview(){
+  const ua = navigator.userAgent || '';
+  const isAndroidWv = /; wv\)/.test(ua) || (/Android/.test(ua) && !/Chrome\//.test(ua));
+  const isContentUri = location.protocol === 'content:' || location.href.startsWith('content://');
+  return isAndroidWv || isContentUri;
+}
+
+function showEmbedWarning(){
+  if(document.getElementById('embedWarn')) return;
+  const w = document.createElement('div');
+  w.id = 'embedWarn';
+  w.className = 'card';
+  w.style.borderColor = 'rgba(255,92,114,.4)';
+  w.style.background = 'linear-gradient(180deg, rgba(255,92,114,.12), rgba(255,92,114,.03))';
+  w.innerHTML = '<b style="display:block;margin-bottom:4px;">You opened this inside WhatsApp</b>' +
+    '<span style="font-size:12.5px;color:var(--ink-dim);line-height:1.5;">WhatsApp\'s built-in viewer blocks GPU access and limits memory, so bigger models will crash. Tap the ⋮ menu top-right → <b style="color:var(--ink)">Open with</b> → choose <b style="color:var(--ink)">Chrome</b> for full speed and reliability. The Ultra-light model below still works here.</span>';
+  setup.insertBefore(w, setup.children[1]);
+}
+
+async function detectEngine(){
+  if('gpu' in navigator){
+    try{
+      const adapter = await navigator.gpu.requestAdapter();
+      if(adapter){ engineType = 'webgpu'; return; }
+    }catch(e){ /* fall through */ }
+  }
+  engineType = 'wasm';
+}
+
+(async ()=>{
+  await detectEngine();
+  const missingKey = engineType === 'webgpu' ? 'gpu' : 'cpu';
+  engineBadgeVal.textContent = engineType === 'webgpu' ? 'GPU mode — fast' : 'CPU mode — no GPU found, still works';
+  document.querySelectorAll('.model').forEach(el=>{
+    if(!el.dataset[missingKey]){
+      el.classList.add('disabled');
+      el.querySelector('.tag').textContent = engineType==='webgpu' ? 'needs update' : 'needs GPU';
+    }
+  });
+  if(selectedEl.classList.contains('disabled')){
+    const fallback = document.querySelector('.model:not(.disabled)');
+    if(fallback){ selectedEl.classList.remove('sel'); fallback.classList.add('sel'); selectedEl = fallback; }
+  }
+  if(isEmbeddedWebview()){
+    showEmbedWarning();
+  }
+  refreshDownloadedTags();
+})();
+
+loadBtn.addEventListener('click', ()=> loadModel());
+
+async function loadModel(){
+  clearError();
+  loadBtn.disabled = true;
+  progwrap.classList.add('show');
+  const modelId = engineType==='webgpu' ? selectedEl.dataset.gpu : selectedEl.dataset.cpu;
+  statusText.textContent = isDownloaded(modelId) ? 'loading from device (already downloaded)…' : 'downloading…';
+  progText.textContent = isDownloaded(modelId) ? 'Reading cached model from device…' : 'Starting…';
+
+  try{
+    if(engineType === 'webgpu'){
+      await loadWebGPU(selectedEl.dataset.gpu);
+      markDownloaded(selectedEl.dataset.gpu);
+    } else {
+      if(!selectedEl.dataset.cpu){ throw new Error('This model needs a GPU. Pick another one.'); }
+      await loadWasm(selectedEl.dataset.cpu);
+      markDownloaded(selectedEl.dataset.cpu);
+    }
+    refreshDownloadedTags();
+    statusDot.classList.add('on');
+    statusText.textContent = 'ready · fully offline (' + (engineType==='webgpu'?'GPU':'CPU') + ')';
+    setup.style.display = 'none';
+    chat.classList.add('show');
+    inputbar.classList.add('show');
+    sendBtn.disabled = false;
+    txt.focus();
+  }catch(err){
+    console.error(err);
+    // If GPU path failed at runtime, auto-fallback to CPU once
+    if(engineType === 'webgpu'){
+      const cpuId = selectedEl.dataset.cpu;
+      if(cpuId){
+        showError('GPU path failed (' + (err.message||err) + '). Retrying automatically on CPU…', 'Switching to CPU');
+        engineType = 'wasm';
+        progText.textContent = 'Retrying on CPU…';
+        try{
+          await loadWasm(cpuId);
+          markDownloaded(cpuId);
+          refreshDownloadedTags();
+          clearError();
+          statusDot.classList.add('on');
+          statusText.textContent = 'ready · fully offline (CPU)';
+          setup.style.display = 'none';
+          chat.classList.add('show');
+          inputbar.classList.add('show');
+          sendBtn.disabled = false;
+          txt.focus();
+          return;
+        }catch(err2){
+          console.error(err2);
+          showError(String(err2.message || err2), 'CPU fallback also failed');
+        }
+      } else {
+        showError('No CPU fallback exists for this model. Pick a smaller model from the list above.', 'Load failed');
+      }
+    } else {
+      showError(String(err.message || err), 'Load failed');
+    }
+    resetLoadUI();
+  }
+}
+
+async function loadWebGPU(modelId){
+  if(!webllm) webllm = await import("https://esm.run/@mlc-ai/web-llm");
+  engine = await webllm.CreateMLCEngine(modelId, {
+    initProgressCallback: (p)=>{
+      const pct = Math.round((p.progress||0)*100);
+      progFill.style.width = pct + '%';
+      progPct.textContent = pct + '%';
+      progText.textContent = p.text || 'Loading…';
+    }
+  });
+}
+
+// ---- WASM inference runs entirely inside a Web Worker so the page/laptop
+// never freezes while the model thinks. Two bugs had to be fixed to get here:
+//  1) The raw jsdelivr build uses bare import specifiers ("onnxruntime-web/webgpu")
+//     that only resolve through a bundler — esm.run pre-bundles those into real
+//     URLs, so we use esm.run instead.
+//  2) Chrome refuses to let a module Worker's import chain follow a redirect,
+//     and esm.run's URL 302s — so inside the worker we fetch() it first (fetch
+//     follows redirects freely) and import() the final resolved URL instead.
+let cpuWorker = null;
+let workerReqId = 0;
+let useMainThreadCpu = false;
+let mainThreadPipeline = null, MainTextStreamer = null;
+const workerPending = new Map();
+
+function getCpuWorker(){
+  if(cpuWorker) return cpuWorker;
+  const code = `
+    let mod = null, pipe = null;
+    self.onmessage = async (e) => {
+      const { id, type, payload } = e.data;
+      try {
+        if (type === 'load') {
+          const res = await fetch("https://esm.run/@huggingface/transformers");
+          mod = await import(res.url);
+          try {
+            mod.env.backends.onnx.wasm.numThreads = 1;
+            mod.env.backends.onnx.wasm.proxy = false;
+          } catch(err) {}
+          pipe = await mod.pipeline('text-generation', payload.modelId, {
+            dtype: 'q4',
+            device: 'wasm',
+            progress_callback: (p) => {
+              self.postMessage({ id, type: 'progress', payload: p });
+            }
+          });
+          self.postMessage({ id, type: 'loaded' });
+        } else if (type === 'generate') {
+          const streamer = new mod.TextStreamer(pipe.tokenizer, {
+            skip_prompt: true,
+            callback_function: (piece) => self.postMessage({ id, type: 'token', payload: piece })
+          });
+          await pipe(payload.history, { max_new_tokens: payload.maxTokens || 200, temperature: 0.7, do_sample: false, streamer });
+          self.postMessage({ id, type: 'done' });
+        }
+      } catch (err) {
+        self.postMessage({ id, type: 'error', payload: String(err && err.message || err) });
+      }
+    };
+  `;
+  const blob = new Blob([code], { type: 'application/javascript' });
+  cpuWorker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+  cpuWorker.onmessage = (e)=>{
+    const { id, type, payload } = e.data;
+    const handlers = workerPending.get(id);
+    if(!handlers) return;
+    if(type === 'progress') handlers.onProgress && handlers.onProgress(payload);
+    else if(type === 'token') handlers.onToken && handlers.onToken(payload);
+    else if(type === 'loaded' || type === 'done'){ handlers.resolve(); workerPending.delete(id); }
+    else if(type === 'error'){ handlers.reject(new Error(payload)); workerPending.delete(id); }
+  };
+  cpuWorker.onerror = (e)=>{
+    // Worker crashed outright (unsupported environment) — reject everything
+    // in-flight so loadWasm() can fall back to the main thread.
+    for(const [id, h] of workerPending){ h.reject(new Error('worker-crashed: ' + e.message)); }
+    workerPending.clear();
+    cpuWorker = null;
+  };
+  return cpuWorker;
+}
+
+function workerCall(type, payload, onProgress, onToken){
+  const w = getCpuWorker();
+  const id = ++workerReqId;
+  return new Promise((resolve, reject)=>{
+    workerPending.set(id, { resolve, reject, onProgress, onToken });
+    w.postMessage({ id, type, payload });
+  });
+}
+
+async function loadWasm(modelId){
+  try{
+    await workerCall('load', { modelId }, (p)=>{
+      if(p.status === 'progress' && p.total){
+        const pct = Math.round((p.loaded / p.total) * 100);
+        progFill.style.width = pct + '%';
+        progPct.textContent = pct + '%';
+        progText.textContent = 'Downloading ' + (p.file || 'model') + '…';
+      } else if(p.status){
+        progText.textContent = p.status;
+      }
+    });
+    progFill.style.width = '100%'; progPct.textContent = '100%';
+    return;
+  }catch(err){
+    const msg = String(err && err.message || err);
+    if(/array buffer|allocation failed|out of memory|memory access/i.test(msg)){
+      throw new Error('Ran out of memory in this in-app browser. Open the file with Chrome directly (⋮ menu → Open with → Chrome), or pick the Ultra-light model.');
+    }
+    // Worker genuinely unsupported in this browser — fall back to main thread
+    // as a last resort (this one may briefly pause the page while replying).
+    console.warn('Worker path failed, falling back to main thread:', msg);
+    progText.textContent = 'Worker unavailable, retrying…';
+    await loadWasmMainThread(modelId);
+    useMainThreadCpu = true;
+  }
+}
+
+async function loadWasmMainThread(modelId){
+  const mod = await import("https://esm.run/@huggingface/transformers");
+  MainTextStreamer = mod.TextStreamer;
+  try{
+    mod.env.backends.onnx.wasm.numThreads = 1;
+    mod.env.backends.onnx.wasm.proxy = false;
+  }catch(e){}
+  try{
+    mainThreadPipeline = await mod.pipeline('text-generation', modelId, {
+      dtype: 'q4',
+      device: 'wasm',
+      progress_callback: (p)=>{
+        if(p.status === 'progress' && p.total){
+          const pct = Math.round((p.loaded / p.total) * 100);
+          progFill.style.width = pct + '%';
+          progPct.textContent = pct + '%';
+          progText.textContent = 'Downloading ' + (p.file || 'model') + '…';
+        } else if(p.status){
+          progText.textContent = p.status;
+        }
+      }
+    });
+  }catch(err){
+    const msg = String(err && err.message || err);
+    if(/array buffer|allocation failed|out of memory|memory access/i.test(msg)){
+      throw new Error('Ran out of memory. Open the file with Chrome directly (⋮ menu → Open with → Chrome), or pick the Ultra-light model.');
+    }
+    throw err;
+  }
+  progFill.style.width = '100%'; progPct.textContent = '100%';
+}
+
+function addMsg(role, text){
+  emptyState.remove();
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role==='user' ? 'user' : 'bot');
+  d.textContent = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+  return d;
+}
+
+// CPU/WASM has no persistent KV cache between turns, so every reply reprocesses
+// the whole conversation from scratch — keep only the last few turns so replies
+// stay fast as the chat grows, especially on phones.
+function trimmedHistory(){
+  if(engineType !== 'wasm') return history;
+  const sys = history[0];
+  const rest = history.slice(1).slice(-8); // last 4 exchanges
+  return [sys, ...rest];
+}
+
+async function send(){
+  const val = txt.value.trim();
+  if(!val || generating) return;
+  if(engineType==='webgpu' && !engine){ showError('Model engine not ready yet. Wait for "ready" status, or reload.', 'Not ready'); return; }
+  if(engineType==='wasm' && !useMainThreadCpu && !cpuWorker){ showError('Model worker not ready yet. Tap ↺ to reset, then load the model again.', 'Not ready'); return; }
+  if(engineType==='wasm' && useMainThreadCpu && !mainThreadPipeline){ showError('Model not ready yet. Tap ↺ to reset, then load the model again.', 'Not ready'); return; }
+  clearError();
+  txt.value=''; txt.style.height='auto';
+  addMsg('user', val);
+  history.push({ role:'user', content: val });
+
+  generating = true; sendBtn.disabled = true;
+  const botEl = addMsg('bot', '');
+  botEl.classList.add('thinking');
+  botEl.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>';
+  const speedEl = document.createElement('div');
+  speedEl.style.cssText = 'font-size:10.5px;color:var(--ink-dim);margin-top:5px;';
+  if(engineType === 'wasm'){ botEl.after(speedEl); }
+
+  try{
+    let full = '';
+    let started = false;
+    let tokenCount = 0;
+    const t0 = performance.now();
+    function tickSpeed(){
+      const secs = (performance.now() - t0) / 1000;
+      const rate = secs > 0 ? (tokenCount / secs) : 0;
+      speedEl.textContent = tokenCount + ' tokens · ' + rate.toFixed(1) + ' tok/s (CPU)';
+    }
+
+    if(engineType === 'webgpu'){
+      const stream = await engine.chat.completions.create({ messages: history, stream: true, temperature: 0.7 });
+      for await (const chunk of stream){
+        const delta = chunk.choices?.[0]?.delta?.content || '';
+        if(delta){
+          if(!started){ botEl.classList.remove('thinking'); botEl.innerHTML=''; started = true; }
+          full += delta;
+          botEl.textContent = full;
+          chat.scrollTop = chat.scrollHeight;
+        }
+      }
+    } else {
+      if(useMainThreadCpu){
+        const streamer = new MainTextStreamer(mainThreadPipeline.tokenizer, {
+          skip_prompt: true,
+          callback_function: (piece)=>{
+            if(!started){ botEl.classList.remove('thinking'); botEl.innerHTML=''; started = true; }
+            full += piece;
+            tokenCount++;
+            tickSpeed();
+            botEl.textContent = full;
+            chat.scrollTop = chat.scrollHeight;
+          }
+        });
+        await mainThreadPipeline(trimmedHistory(), { max_new_tokens: 200, temperature: 0.7, do_sample: false, streamer });
+      } else {
+        await workerCall('generate', { history: trimmedHistory(), maxTokens: 200 }, null, (piece)=>{
+          if(!started){ botEl.classList.remove('thinking'); botEl.innerHTML=''; started = true; }
+          full += piece;
+          tokenCount++;
+          tickSpeed();
+          botEl.textContent = full;
+          chat.scrollTop = chat.scrollHeight;
+        });
+      }
+      speedEl.textContent = 'done · ' + tokenCount + ' tokens in ' + ((performance.now()-t0)/1000).toFixed(1) + 's';
+    }
+    history.push({ role:'assistant', content: full });
+  }catch(err){
+    botEl.classList.remove('thinking');
+    botEl.textContent = 'Error: ' + (err.message || err);
+    speedEl.remove();
+  }finally{
+    generating = false; sendBtn.disabled = false;
+  }
+}
+
+sendBtn.addEventListener('click', send);
+txt.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+txt.addEventListener('input', ()=>{
+  txt.style.height='auto';
+  txt.style.height = Math.min(txt.scrollHeight,120)+'px';
+});
+
+$('#resetBtn').addEventListener('click', ()=>{
+  if(!confirm('Clear this chat?')) return;
+  history = [history[0]];
+  chat.innerHTML = '';
+  const e = document.createElement('div');
+  e.className='empty'; e.id='emptyState';
+  e.innerHTML = '<b>Chat cleared.</b>Ask anything.';
+  chat.appendChild(e);
+});
+
+// ---- PWA install: manifest via Blob, service worker via Blob (single file, no extra assets) ----
+const manifest = {
+  name: "Offline AI", short_name: "Offline AI", start_url: ".", display: "standalone",
+  background_color: "#0b0d10", theme_color: "#0b0d10",
+  icons: [{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236a5cff'/%3E%3Cpath d='M30 65 L50 25 L70 65 M38 50 L62 50' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E", sizes:"100x100", type:"image/svg+xml", purpose:"any" }]
+};
+const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+const link = document.createElement('link');
+link.rel = 'manifest'; link.href = URL.createObjectURL(manifestBlob);
+document.head.appendChild(link);
+
+async function registerSW(){
+  const swCode = `
+    const CACHE = 'offline-ai-v2';
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => self.clients.claim());
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.open(CACHE).then(async cache => {
+          const cached = await cache.match(e.request);
+          if (cached) return cached;
+          try {
+            const res = await fetch(e.request);
+            if (res && res.status === 200) cache.put(e.request, res.clone());
+            return res;
+          } catch(err) {
+            return cached || Response.error();
+          }
+        })
+      );
+    });
+  `;
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(swBlob);
+  await navigator.serviceWorker.register(swUrl);
+}
+if('serviceWorker' in navigator){ registerSW().catch(()=>{}); }
+</script>
+</body>
+</html>
